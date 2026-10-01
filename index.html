@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Security Camera</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <p class="eyebrow">IoT · COMPUTER VISION</p>
+      <h1>Smart Security Camera</h1>
+      <p class="subtitle">Motion detection and event monitoring dashboard</p>
+    </header>
+
+    <section class="cards">
+      <article class="card">
+        <span class="label">Camera</span>
+        <strong id="camera-status">{{ "Running" if state.running else "Not running" }}</strong>
+      </article>
+      <article class="card">
+        <span class="label">Motion</span>
+        <strong id="motion-status">{{ "Detected" if state.motion else "None detected" }}</strong>
+      </article>
+      <article class="card">
+        <span class="label">Last event</span>
+        <strong class="small" id="last-event">{{ state.last_event or "No events yet" }}</strong>
+      </article>
+    </section>
+
+    {% if state.error %}
+    <div class="notice">{{ state.error }}. Check the camera connection and CAMERA_INDEX in .env.</div>
+    {% endif %}
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Recent motion events</h2>
+          <p>Latest events detected by the camera</p>
+        </div>
+        <button id="refresh">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Event ID</th><th>Timestamp</th><th>Changed area (px)</th></tr></thead>
+          <tbody id="events">
+            <tr><td colspan="3">Loading events…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <footer>Educational prototype. Use cameras responsibly and keep credentials private.</footer>
+  </main>
+  <script>
+    async function refreshDashboard() {
+      try {
+        const [statusResponse, eventsResponse] = await Promise.all([
+          fetch('/api/status'), fetch('/api/events')
+        ]);
+        const status = await statusResponse.json();
+        const events = await eventsResponse.json();
+        document.getElementById('camera-status').textContent =
+          status.running ? 'Running' : 'Not running';
+        document.getElementById('motion-status').textContent =
+          status.motion ? 'Detected' : 'None detected';
+        document.getElementById('last-event').textContent =
+          status.last_event || 'No events yet';
+
+        const tbody = document.getElementById('events');
+        tbody.replaceChildren();
+        if (!events.length) {
+          const row = tbody.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 3;
+          cell.textContent = 'No motion events recorded yet.';
+        } else {
+          for (const event of events) {
+            const row = tbody.insertRow();
+            for (const value of [event.id, event.timestamp, event.area]) {
+              const cell = row.insertCell();
+              cell.textContent = value;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Dashboard refresh failed:', error);
+      }
+    }
+    document.getElementById('refresh').addEventListener('click', refreshDashboard);
+    refreshDashboard();
+    setInterval(refreshDashboard, 5000);
+  </script>
+</body>
+</html>
